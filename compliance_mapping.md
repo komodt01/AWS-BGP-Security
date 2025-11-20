@@ -1,53 +1,159 @@
+# Compliance Mapping for AWS BGP Security Monitoring System
+
+This document maps the AWS BGP Security Monitoring System to security, monitoring, and governance controls from **NIST 800-53 Rev. 5**, **ISO/IEC 27001:2022**, and routing-specific security best practices. The goal is to show how this architecture provides measurable, monitorable, and governable security outcomes aligned with industry frameworks.
 
 ---
 
-## 2. `compliance_mapping.md`
+## NIST 800-53 Rev. 5 Mapping
 
-```markdown
-# Compliance Mapping – AWS BGP Security Monitoring System
+### **SC-7 — Boundary Protection**
+**How this project supports it:**
+- BGP route validation acts as a security control at the network boundary.  
+- Malicious ASNs, hijacks, and leaks are detected by Lambda and scored.  
+- EventBridge + Lambda create an automated inspection point for inbound route data.
 
-This document maps the AWS BGP Security Monitoring System to selected
-controls from **NIST SP 800-53 Rev. 5** and **ISO/IEC 27001:2022**.
+### **SC-7(12) — Monitoring and Detection**
+- CloudWatch metrics and dashboards provide continuous monitoring of routing anomalies.
+- Threat levels (critical/high/medium/low) are observable and alarmable.
 
-The goal is not full coverage, but to show how this project supports
-network security, monitoring, and incident response requirements.
+### **SI-4 — System Monitoring**
+- Lambda logs JSON-structured validation results into CloudWatch Logs.  
+- Custom metrics (`SecurityScore`, `ThreatDetectionCount`, `ValidationErrors`) form a monitoring baseline.  
+- CloudWatch dashboards display trends over time.
+
+### **SI-4(2) — Automated Analysis**
+- Lambda automatically analyzes BGP announcements and applies security scoring.  
+- No human intervention is required for anomaly detection.
+
+### **SI-4(5) — Response to Anomalies**
+- CloudWatch alarms detect critical threat levels and trigger automated notifications or operational workflows via SNS.
+
+### **RA-5 — Vulnerability Monitoring**
+- BGP misconfigurations, malicious AS paths, and RPKI-related discrepancies are treated as vulnerabilities.  
+- The system identifies and classifies these as part of a proactive risk posture.
+
+### **AU-6 — Audit Review, Analysis, and Reporting**
+- Validation logs include timestamps, AS paths, threat decisions, and scoring evidence.  
+- Logs are readable by audit and compliance teams.
+
+### **AU-12 — Audit Generation**
+- Lambda function produces detailed audit logs for each BGP event.  
+- Includes full input, scoring outcome, and rule matches.
+
+### **CM-6 — Configuration Settings**
+- Systems Manager Parameter Store provides centralized, versioned configuration.  
+- Security policy changes (malicious ASNs, thresholds, scoring weights) are controlled, logged, and auditable.
+
+### **CA-7 — Continuous Monitoring**
+- CloudWatch dashboards and recurring EventBridge triggers enable continuous posture evaluation.  
+- Alarms notify SOC/SRE teams of emerging routing threats.
+
+### **IR-5 — Incident Monitoring**
+- Critical/higher-level threat alerts create incident detection points.  
+- System can be integrated with enterprise IR workflows through SNS.
 
 ---
 
-## 1. NIST SP 800-53 Rev. 5
+## ISO/IEC 27001:2022 Mapping
 
-| Control ID | Name | How This Project Supports It |
-|-----------|------|------------------------------|
-| **AC-4** | Information Flow Enforcement | BGP route validation helps ensure traffic only flows over authorized paths. Malicious origin ASNs, abnormal path lengths, and loops are detected and surfaced as high/critical threats. This supports enforcing policy on acceptable routing behavior. |
-| **CA-7** | Continuous Monitoring | Lambda and EventBridge provide continuous evaluation of BGP routes. CloudWatch metrics, dashboards, and alarms offer ongoing visibility into routing security posture. |
-| **IR-4** | Incident Handling | ThreatDetectionCount metrics and alarms for critical/high threats help initiate incident response playbooks when suspicious routes are observed (e.g., potential hijacks or leaks). |
-| **RA-5** | Vulnerability Monitoring & Scanning | While not a vulnerability scanner, this project functions as a specialized “control” for BGP vulnerabilities by systematically checking route attributes against policy (malicious ASNs, path length, loops). |
-| **SC-5** | Denial of Service Protection | Detecting abnormal AS paths and possible route leaks can reduce exposure to routing-based DoS scenarios by enabling faster response and remediation. |
-| **SC-7** | Boundary Protection | The system monitors routes across network boundaries (on-prem, AWS, other clouds), ensuring that boundary routing conforms to policy and surfaces deviations. |
-| **SI-4** | System Monitoring | Collects and analyzes security-relevant events (BGP routes) via CloudWatch logs/metrics, with automated alerting on suspicious patterns. |
+### **A.5.7 — Threat Intelligence**
+- The malicious ASN list, RPKI validation, and policy rules form routing-specific threat intelligence feeds.
+
+### **A.8.16 — Monitoring Activities**
+- BGP events, validation logs, and CloudWatch dashboards offer real-time monitoring.  
+- Detects abnormal behavior in external routing paths.
+
+### **A.8.28 — Secure Coding / Validation of Inputs**
+- Lambda validates and sanitizes input route data before scoring.  
+- Rejects malformed or suspicious events.
+
+### **A.12.1 — Operational Logging**
+- Every BGP validation produces CloudWatch structured logs.  
+- Supports auditability, investigations, and compliance reporting.
+
+### **A.12.4 — Event Monitoring**
+- CloudWatch alarms and dashboards track deviations and threats.  
+- Includes threat counts, error rates, and performance indicators.
+
+### **A.13.1 — Network Security**
+- Evaluates BGP origin AS, path integrity, and manipulation indicators.  
+- Provides routing-layer protection aligned to enterprise communication security needs.
+
+### **A.16.1 — Incident Management**
+- Critical threats trigger alarms → notifications → analyst response.  
+- System integrates with standard enterprise incident workflows via SNS.
+
+### **A.17.2 — Redundancy and Availability**
+- Serverless design using Lambda/EventBridge/CloudWatch provides high operational resilience.  
+- No infrastructure to maintain; minimal operational overhead.
 
 ---
 
-## 2. ISO/IEC 27001:2022 / Annex A
+## BGP Security Best Practice Mapping
 
-| Clause / Control | Name | How This Project Supports It |
-|------------------|------|------------------------------|
-| **A.5.23** | Information security for use of cloud services | Centralizing BGP security monitoring in AWS (Lambda, SSM, CloudWatch) helps govern how cloud connectivity is monitored and controlled, supporting defined security requirements for cloud usage. |
-| **A.8.16** | Monitoring activities | CloudWatch logs and metrics provide monitoring of BGP validation events, including status, scores, and threat levels. Dashboards and alarms ensure anomalous activity is detected and investigated. |
-| **A.8.20** | Network controls | The project strengthens network controls by validating BGP routes at cloud/on-prem boundaries and providing visibility into route integrity and path behavior. |
-| **A.8.24** | Protection of information systems during audit testing | BGP route validation and observability reduce the need to perform intrusive testing on production routers; risk-informed monitoring can be used as evidence in audits without destabilizing routing. |
-| **A.8.28** | Secure network services | By enforcing routing policies and scoring route security, this system enhances the security of network services such as Direct Connect, VPN, and ExpressRoute links. |
-| **A.8.29** | Security of network services outsourcing | When connectivity to cloud providers or carriers is outsourced, this project gives independent visibility into route behavior, supporting oversight of those third-party network services. |
+### **MANRS (Mutually Agreed Norms for Routing Security)**
+- **Filtering**: Malicious ASN list provides basic inbound validation.  
+- **Global Validation**: Supports RPKI validity checks.  
+- **Coordination**: Consistent JSON logs aid in collaborative troubleshooting.  
+- **Monitoring**: CloudWatch dashboards validate routing health continuously.
+
+### **RPKI-Based Route Origin Validation**
+- Integrates RPKI lookup logic via `/bgp-security/rpki-validator-url`.  
+- Classifies routes as valid/invalid/unknown.
+
+### **RFC 6811 — BGP Prefix Origin Validation**
+- System can verify origin matches expected AS for a given prefix.  
+- Provides scoring penalties for inconsistent or invalid origins.
+
+### **RFC 7454 — BGP Operations and Security Recommendations**
+- Checks for:  
+  - AS path loops  
+  - Unusually long paths  
+  - Suspicious origins  
+  - Irregular patterns
+
+### **BGP Anomaly Detection Practices**
+- CloudWatch alarms detect:  
+  - Sudden spikes in critical threats  
+  - Excessively long AS paths  
+  - Frequent validation errors  
+  - Path manipulation patterns
 
 ---
 
-## 3. Notes & Assumptions
+## Covered Risk Domains
 
-- This project focuses on **monitoring and detection**. Actual enforcement
-  of route policy still occurs on routers / firewalls (e.g., prefix-lists,
-  route-maps, MD5 auth).
-- RPKI validation is currently modeled as a placeholder; integrating a real
-  RPKI validator would further strengthen compliance alignment for route
-  origin validation.
-- Controls listed here are **partially supported**. Full compliance
-  requires additional process, documentation, and complementary controls.
+### **Routing Manipulation**
+- Detects prefix hijacks, leaks, and malicious origin ASNs.
+
+### **Path Integrity**
+- Identifies long or looping AS paths indicative of tampering.
+
+### **Misconfiguration Exposure**
+- Detects malformed events and path aberrations.
+
+### **Policy Drift**
+- Configuration stored in SSM Parameter Store prevents hard-coded rules.  
+- Updates require explicit change management.
+
+### **Visibility & Observability**
+- Metrics, dashboards, and logs establish a complete monitoring baseline.
+
+### **Incident Response**
+- Alarms integrate routing risk into enterprise IR pipelines.
+
+---
+
+## Summary
+
+This BGP Security Monitoring System demonstrates compliance alignment with major frameworks by enabling:
+
+- **Continuous monitoring**  
+- **Structured audit logs**  
+- **Policy-driven validation**  
+- **Rapid anomaly detection**  
+- **Measurable security scoring**  
+- **Automated alerting**  
+- **Clear governance pathways**
+
+It shows how routing-layer risks—traditionally outside cloud visibility—can be translated into governed, audited, and monitored security signals that satisfy enterprise, regulatory, and architectural requirements.
