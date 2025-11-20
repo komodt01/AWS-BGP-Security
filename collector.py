@@ -1,172 +1,222 @@
 #!/usr/bin/env python3
 """
-collector.py – Example BGP collector for the AWS BGP Security Monitoring System.
+collector.py - BGP Route Collector and Validator Client
 
-Purpose:
-  - Runs close to your BGP routers (Linux jump host, NOC server, container)
-  - Reads BGP routes from a file or other source
-  - Normalizes them into the JSON structure expected by bgp-validator
-  - Publishes them to Amazon EventBridge (or invokes Lambda directly)
+This script acts as a simple "collector" that sends BGP route data
+to the BGP Security Lambda function and prints a human-readable summary.
 
-Usage:
-  python3 collector.py --source routes.jsonl --mode eventbridge
+Typical usage in this project:
+  - Read a test JSON payload from tests/*.json
+  - Invoke the bgp-validator Lambda
+  - Print validation status, security score, and threat level
+
+It can be extended later to integrate with real BGP collectors (e.g., ExaBGP,
+router streaming telemetry, or log pipelines).
 """
 
 import argparse
 import json
+import os
 import sys
-from typing import Iterable, Dict, Any
+from typing import Any, Dict
 
 import boto3
+from botocore.exceptions import BotoCoreError, ClientError
 
 
-def load_routes_from_jsonl(path: str) -> Iterable[Dict[str, Any]]:
+def load_payload_from_file(path: str) -> Dict[str, Any]:
+    """Load a JSON payload from a file."""
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data
+    except FileNotFoundError:
+        print(f"[ERROR] Payload file not found: {path}", file=sys.stderr)
+        sys.exit(1)
+    except json.JSONDecodeError as e:
+        print(f"[ERROR] Failed to parse JSON from {path}: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+def load_payload_from_stdin() -> Dict[str, Any]:
+    """Load a JSON payload from stdin."""
+    try:
+        data = json.load(sys.stdin)
+        return data
+    except json.JSONDecodeError as e:
+        print(f"[ERROR] Failed to parse JSON from stdin: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+def validate_bgp_payload(payload: Dict[str, Any]) -> None:
     """
-    Load BGP routes from a JSON Lines file.
-    Each line should be a JSON object like:
-      {"prefix": "8.8.8.0/24", "origin_as": 15169, "as_path": [64512, 15169]}
+    Validate that the payload has the fields expected by the Lambda:
+      - prefix (str)
+      - origin_as (int)
+      - as_path (list of int)
+    This is a light sanity check; Lambda does deeper validation.
     """
-    with open(path, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                obj = json.loads(line)
-                yield obj
-            except json.JSONDecodeError:
-                print(f"Skipping invalid JSON line: {line}", file=sys.stderr)
+    required_fields = ["prefix", "origin_as", "as_path"]
+
+    missing = [f for f in required_fields if f not in payload]
+    if missing:
+        print(f"[WARN] Payload is missing fields: {', '.join(missing)}", file=sys.stderr)
+
+    if "as_path" in payload and not isinstance(payload["as_path"], list):
+        print("[WARN] 'as_path' should be a list (e.g., [64512, 15169])", file=sys.stderr)
 
 
-def load_routes_from_stdin() -> Iterable[Dict[str, Any]]:
-    """
-    Read routes from STDIN, one JSON object per line.
-    """
-    for line in sys.stdin:
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            yield json.loads(line)
-        except json.JSONDecodeError:
-            print(f"Skipping invalid JSON line: {line}", file=sys.stderr)
+def invoke_lambda(
+    function_name: str,
+    region: str,
+    payload: Dict[str, Any],
+    log_raw_response: bool = False,
+) -> Dict[str, Any]:
+    """Invoke the BGP Security Lambda and return the parsed result body."""
+    try:
+        client = boto3.client("lambda", region_name=region)
+    except (BotoCoreError, ClientError) as e:
+        print(f"[ERROR] Failed to create Lambda client: {e}", file=sys.stderr)
+        sys.exit(1)
 
-
-def send_to_eventbridge(routes: Iterable[Dict[str, Any]],
-                        bus_name: str,
-                        source: str,
-                        detail_type: str):
-    """
-    Publish routes to Amazon EventBridge as individual events.
-    """
-    client = boto3.client("events")
-    entries = []
-
-    for route in routes:
-        entries.append(
-            {
-                "Source": source,
-                "DetailType": detail_type,
-                "Detail": json.dumps(route),
-                "EventBusName": bus_name,
-            }
-        )
-
-        # EventBridge PutEvents max 10 at a time
-        if len(entries) == 10:
-            resp = client.put_events(Entries=entries)
-            failed = resp.get("FailedEntryCount", 0)
-            if failed:
-                print(f"[WARN] {failed} entries failed in PutEvents batch", file=sys.stderr)
-            entries = []
-
-    if entries:
-        resp = client.put_events(Entries=entries)
-        failed = resp.get("FailedEntryCount", 0)
-        if failed:
-            print(f"[WARN] {failed} entries failed in final PutEvents batch", file=sys.stderr)
-
-
-def send_to_lambda(routes: Iterable[Dict[str, Any]], function_name: str):
-    """
-    Invoke the bgp-validator Lambda directly for each route.
-    """
-    client = boto3.client("lambda")
-
-    for route in routes:
-        payload = json.dumps(route).encode("utf-8")
-        resp = client.invoke(
+    try:
+        response = client.invoke(
             FunctionName=function_name,
             InvocationType="RequestResponse",
-            Payload=payload,
+            Payload=json.dumps(payload).encode("utf-8"),
         )
-        if "FunctionError" in resp:
-            print(
-                f"[ERROR] Lambda error for route {route}: {resp['FunctionError']}",
-                file=sys.stderr,
-            )
+    except (BotoCoreError, ClientError) as e:
+        print(f"[ERROR] Error invoking Lambda function '{function_name}': {e}", file=sys.stderr)
+        sys.exit(1)
+
+    # Read raw payload from Lambda
+    raw_payload = response.get("Payload")
+    if raw_payload is None:
+        print("[ERROR] Lambda response did not contain a Payload field.", file=sys.stderr)
+        sys.exit(1)
+
+    raw_body = raw_payload.read()
+    try:
+        lambda_response = json.loads(raw_body.decode("utf-8"))
+    except json.JSONDecodeError as e:
+        print(f"[ERROR] Failed to decode Lambda response JSON: {e}", file=sys.stderr)
+        print(f"Raw response: {raw_body}", file=sys.stderr)
+        sys.exit(1)
+
+    if log_raw_response:
+        print("=== Raw Lambda Response ===")
+        print(json.dumps(lambda_response, indent=2))
+
+    # Many Lambda + API Gateway-style functions wrap the actual body in a 'body' field
+    result_body = lambda_response.get("body", lambda_response)
+    if isinstance(result_body, str):
+        try:
+            result_body = json.loads(result_body)
+        except json.JSONDecodeError:
+            # If body is not JSON, just leave as string
+            pass
+
+    if not isinstance(result_body, dict):
+        print("[WARN] Lambda result body is not a JSON object; printing as-is.")
+        print(result_body)
+        return {}
+
+    return result_body
 
 
-def parse_args():
-    parser = argparse.ArgumentParser(description="BGP Collector for AWS BGP Security Monitoring")
+def print_summary(result: Dict[str, Any]) -> None:
+    """Print a compact, human-readable summary of the validation result."""
+    prefix = result.get("prefix", "<unknown>")
+    origin_as = result.get("origin_as", "<unknown>")
+    status = result.get("validation_status", "<unknown>")
+    score = result.get("security_score", "<unknown>")
+    threat = result.get("threat_level", "<unknown>")
+    reasons = result.get("reasons", [])
+
+    print("\n=== BGP Validation Result ===")
+    print(f"Prefix:         {prefix}")
+    print(f"Origin ASN:     {origin_as}")
+    print(f"Status:         {status}")
+    print(f"Security Score: {score}")
+    print(f"Threat Level:   {threat}")
+
+    if reasons:
+        print("\nReasons:")
+        for r in reasons:
+            print(f"  - {r}")
+
+    ts = result.get("timestamp_utc")
+    if ts:
+        print(f"\nTimestamp (UTC): {ts}")
+
+    print("============================\n")
+
+
+def build_arg_parser() -> argparse.ArgumentParser:
+    """Create an argument parser for collector.py."""
+    parser = argparse.ArgumentParser(
+        description="BGP route collector client for the BGP Security Lambda."
+    )
     parser.add_argument(
-        "--source",
-        help="Path to JSONL route file. If omitted and --stdin is set, reads from stdin.",
+        "--file",
+        "-f",
+        help="Path to JSON file containing a single BGP route payload "
+             "(e.g., tests/test_valid_route.json).",
     )
     parser.add_argument(
         "--stdin",
         action="store_true",
-        help="Read routes from stdin (one JSON object per line).",
-    )
-    parser.add_argument(
-        "--mode",
-        choices=["eventbridge", "lambda"],
-        default="eventbridge",
-        help="Delivery mode: eventbridge (default) or lambda direct invoke.",
-    )
-    parser.add_argument(
-        "--event-bus",
-        default="default",
-        help="EventBridge bus name (for mode=eventbridge).",
-    )
-    parser.add_argument(
-        "--event-source",
-        default="bgp.collector",
-        help="EventBridge 'Source' value.",
-    )
-    parser.add_argument(
-        "--event-detail-type",
-        default="BGPRouteUpdate",
-        help="EventBridge 'DetailType' value.",
+        help="Read JSON payload from stdin instead of a file.",
     )
     parser.add_argument(
         "--lambda-function",
-        default="bgp-validator",
-        help="Lambda function name (for mode=lambda).",
+        "-l",
+        dest="lambda_function",
+        default=os.environ.get("LAMBDA_FUNCTION_NAME", "bgp-validator"),
+        help="Name of the Lambda function to invoke "
+             f"(default: env LAMBDA_FUNCTION_NAME or 'bgp-validator').",
     )
-    return parser.parse_args()
+    parser.add_argument(
+        "--region",
+        "-r",
+        default=os.environ.get("AWS_REGION", "us-east-1"),
+        help="AWS region for the Lambda function (default: env AWS_REGION or 'us-east-1').",
+    )
+    parser.add_argument(
+        "--raw",
+        action="store_true",
+        help="Print full raw Lambda response JSON in addition to the summary.",
+    )
+    return parser
 
 
-def main():
-    args = parse_args()
+def main() -> None:
+    parser = build_arg_parser()
+    args = parser.parse_args()
 
-    if args.stdin:
-        routes = load_routes_from_stdin()
-    elif args.source:
-        routes = load_routes_from_jsonl(args.source)
+    if not args.file and not args.stdin:
+        parser.error("You must specify either --file or --stdin as the payload source.")
+
+    # Load BGP payload
+    if args.file:
+        payload = load_payload_from_file(args.file)
     else:
-        print("You must specify --source FILE or --stdin", file=sys.stderr)
-        sys.exit(1)
+        payload = load_payload_from_stdin()
 
-    if args.mode == "eventbridge":
-        send_to_eventbridge(
-            routes,
-            bus_name=args.event_bus,
-            source=args.event_source,
-            detail_type=args.event_detail_type,
-        )
+    validate_bgp_payload(payload)
+
+    print(f"[INFO] Invoking Lambda '{args.lambda_function}' in region '{args.region}'...")
+    result = invoke_lambda(
+        function_name=args.lambda_function,
+        region=args.region,
+        payload=payload,
+        log_raw_response=args.raw,
+    )
+
+    if result:
+        print_summary(result)
     else:
-        send_to_lambda(routes, function_name=args.lambda_function)
+        print("[WARN] No structured result returned from Lambda.", file=sys.stderr)
 
 
 if __name__ == "__main__":
