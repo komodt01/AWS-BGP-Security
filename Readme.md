@@ -1,272 +1,171 @@
 # AWS BGP Security Monitoring System
-*Enterprise-grade BGP route validation and threat detection on Amazon Web Services*
 
-![BGP Security](https://img.shields.io/badge/Security-BGP%20Monitoring-red)
-![Platform](https://img.shields.io/badge/Platform-Amazon%20Web%20Services-orange)
-![Status](https://img.shields.io/badge/Status-Production%20Ready-green)
+Enterprise-grade BGP route validation and threat visibility on AWS.
 
-## 🎯 Business Problem
-
-**BGP (Border Gateway Protocol) vulnerabilities pose critical risks to enterprise networks:**
-
-- **Route hijacking** can redirect traffic to malicious destinations
-- **AS path manipulation** enables traffic interception and eavesdropping
-- **Route leaks** can cause service outages and data exposure
-- **Manual monitoring** is time-intensive, error-prone, and doesn't scale
-- **Lack of real-time visibility** into routing security posture
-- **No executive-level reporting** on network security threats
-
-## 💡 Solution Overview
-
-Our **AWS BGP Security Monitoring System** provides automated, real-time BGP route validation with enterprise-grade threat detection and executive reporting capabilities.
-
-### ✅ **Core Capabilities**
-- **Real-time BGP route validation** using RPKI (Resource Public Key Infrastructure)
-- **Multi-layer security analysis** including AS path validation and malicious ASN detection
-- **Automated threat scoring** with 0-100 security assessment scale
-- **Executive dashboards** with threat level visualization and trends
-- **Configurable security policies** via AWS Systems Manager Parameter Store
-- **CloudWatch integration** for monitoring, alerting, and compliance reporting
-
-### ✅ **Technical Architecture**
-- **AWS Lambda** serverless compute for scalable route validation
-- **Systems Manager** centralized configuration and parameter management
-- **CloudWatch** metrics, dashboards, and operational monitoring
-- **Multi-cloud expertise** (also implemented on Google Cloud Platform)
-
-## 🏢 Business Use Cases
-
-### **Enterprise Network Security**
-**Scenario**: Large enterprises need to protect against BGP attacks that can redirect traffic or cause service outages.
-
-**Value**: Automated monitoring replaces manual BGP analysis, providing immediate threat detection and executive visibility into network security posture.
-
-**Impact**: Enables proactive security management and rapid incident response.
-
-### **Internet Service Providers (ISPs)**
-**Scenario**: ISPs must ensure routing integrity for customer traffic while maintaining SLA commitments.
-
-**Value**: Real-time BGP validation with performance monitoring and scalable cloud-native architecture.
-
-**Impact**: Protects customer data, maintains service reliability, supports regulatory compliance.
-
-### **Financial Services**
-**Scenario**: Banks and financial institutions require robust network monitoring for regulatory compliance and fraud prevention.
-
-**Value**: Enterprise-grade BGP security with comprehensive audit trails and executive reporting.
-
-**Impact**: Meets regulatory requirements, protects financial transactions, reduces compliance overhead.
-
-### **Government & Critical Infrastructure**
-**Scenario**: Government agencies need robust network security against nation-state routing attacks.
-
-**Value**: Multi-layered BGP validation with threat intelligence and automated incident response.
-
-**Impact**: National security protection, critical service availability, threat attribution capabilities.
-
-### **Cloud Service Providers**
-**Scenario**: CSPs must protect multi-tenant environments and ensure customer traffic integrity.
-
-**Value**: Automated BGP monitoring with multi-region deployment and integration capabilities.
-
-**Impact**: Customer trust, service differentiation, operational efficiency.
-
-## 🛡️ Security Threat Detection
-
-### **BGP Attack Scenarios Detected**
-- **Route Hijacking**: Malicious AS announces legitimate IP prefixes
-- **AS Path Manipulation**: Attackers insert themselves into routing paths
-- **Route Leaks**: Accidental announcement of private or customer routes
-- **Prefix Spoofing**: Announcement of IP ranges not owned by the origin AS
-- **Path Poisoning**: Manipulation of AS paths to influence routing decisions
-
-### **Validation Layers**
-1. **AS Path Analysis** - Loop detection, length validation, malicious ASN identification
-2. **RPKI Validation** - Cryptographic route origin verification
-3. **Prefix Validation** - Format checking and ownership verification
-4. **Geographic Consistency** - Route path geographic analysis (future enhancement)
-
-## 📊 Technical Capabilities
-
-### **Real-time Processing**
-- **Sub-second validation** response times
-- **Scalable architecture** supporting high-volume BGP feeds
-- **Concurrent processing** of multiple route validations
-- **Auto-scaling** based on traffic demands
-
-### **Security Scoring**
-- **Weighted algorithm** combining multiple security factors
-- **Threat level classification** (Low/Medium/High/Critical)
-- **Configurable thresholds** via Systems Manager
-- **Historical trending** and baseline establishment
-
-### **Enterprise Integration**
-- **RESTful API** for system integration
-- **CloudWatch metrics** for monitoring and alerting
-- **Audit logging** for compliance and forensic analysis
-- **Executive dashboards** for security posture communication
-
-## 🚀 Quick Start
-
-### **Prerequisites**
-- AWS CLI configured with appropriate permissions
-- Python 3.9+ for local development
-- Basic understanding of BGP and network security concepts
-
-### **Deployment**
-```bash
-# Clone the repository
-git clone <repository-url>
-cd aws-bgp-security
-
-# Set up AWS environment
-export AWS_PROFILE=your-profile
-export AWS_REGION=us-east-1
-
-# Deploy Systems Manager configuration
-python3 scripts/aws_bgp_systems_manager.py
-
-# Deploy Lambda function
-cd lambda
-zip bgp-validator.zip bgp_with_ssm.py
-aws lambda create-function \
-  --function-name bgp-validator \
-  --runtime python3.9 \
-  --role arn:aws:iam::ACCOUNT:role/lambda-bgp-execution-role \
-  --handler bgp_with_ssm.lambda_handler \
-  --zip-file fileb://bgp-validator.zip
-
-# Test validation
-aws lambda invoke \
-  --function-name bgp-validator \
-  --payload '{"prefix":"8.8.8.0/24","origin_as":15169,"as_path":[64512,15169]}' \
-  result.json
-```
-
-### **Access Monitoring**
-- **CloudWatch Dashboard**: AWS Console → CloudWatch → Dashboards
-- **Lambda Logs**: AWS Console → Lambda → bgp-validator → Monitoring
-- **Systems Manager**: AWS Console → Systems Manager → Parameter Store
-
-## 🏗️ Architecture Overview
-
-```
-BGP Route → Lambda Function → Security Validation → CloudWatch Metrics
-    ↓              ↓                    ↓                 ↓
-Input Data → Systems Manager → Multi-layer Analysis → Executive Dashboard
-```
-
-### **Key Components**
-- **Lambda Function**: Serverless BGP validation processing
-- **Systems Manager**: Centralized configuration and parameter management
-- **CloudWatch**: Metrics collection, dashboard visualization, and alerting
-- **IAM Roles**: Secure service-to-service authentication
-
-## 📈 Monitoring & Alerting
-
-### **Key Metrics Tracked**
-- **Security Score**: Real-time threat assessment (0-100 scale)
-- **Threat Level Distribution**: Critical/High/Medium/Low categorization
-- **Validation Performance**: Response times and throughput
-- **Configuration Source**: Systems Manager vs fallback tracking
-
-### **Automated Alerting**
-- **Critical threats detected** (security score < 50)
-- **High-volume attack patterns** (multiple failed validations)
-- **System performance degradation** (increased response times)
-- **Configuration access issues** (Systems Manager failures)
-
-## 🔧 Configuration Management
-
-### **Systems Manager Integration**
-All security policies and thresholds are managed through AWS Systems Manager Parameter Store:
-
-- `/bgp-security/malicious-asns` - Known malicious AS numbers
-- `/bgp-security/scoring-weights` - Security scoring algorithm weights
-- `/bgp-security/threat-thresholds` - Threat level classification thresholds
-- `/bgp-security/max-as-path-length` - Maximum allowed AS path length
-
-### **Dynamic Configuration Updates**
-- **Runtime parameter updates** without code deployment
-- **Audit trail** of all configuration changes
-- **Version control** and rollback capabilities
-- **Environment-specific configurations** (dev/staging/prod)
-
-## 🌐 Multi-Cloud Architecture
-
-This project demonstrates **multi-cloud network security expertise** with implementations on both:
-
-- **Amazon Web Services** (this repository)
-- **Google Cloud Platform** (companion implementation)
-
-See `aws-vs-gcp-comparison.md` for detailed platform analysis and migration guidance.
-
-## 📚 Documentation
-
-- **[Technologies Guide](technologies.md)** - Deep dive into BGP, AWS services, and security algorithms
-- **[Linux Commands Reference](linuxcommands.md)** - Complete AWS CLI command reference for this project
-- **[Lessons Learned](lessonslearned.md)** - Implementation challenges, solutions, and best practices
-- **[AWS vs GCP Comparison](aws-vs-gcp-comparison.md)** - Multi-cloud platform analysis
-
-## 🛠️ Development & Testing
-
-### **Local Development**
-```bash
-# Install dependencies
-pip3 install boto3 requests
-
-# Run local tests
-python3 tests/test_bgp_validation.py
-
-# Test with various BGP scenarios
-python3 tests/generate_test_data.py
-```
-
-### **BGP Test Scenarios**
-- **Valid routes** (Google DNS, Cloudflare)
-- **Malicious ASNs** (666, 1337, 31337)
-- **AS path loops** and manipulation
-- **Invalid prefix formats**
-- **Extremely long AS paths**
-
-## 🤝 Contributing
-
-This project serves as a **portfolio demonstration** of cloud-native security architecture and multi-cloud expertise. 
-
-For questions about the implementation approach or technical decisions, please refer to the comprehensive documentation in this repository.
-
-## 📄 License
-
-This project is provided for **portfolio and educational purposes**. Please respect intellectual property and use responsibly.
-
-## 🎯 Skills Demonstrated
-
-### **Cloud Architecture**
-- AWS Lambda serverless design and implementation
-- Systems Manager configuration management
-- CloudWatch monitoring and dashboard creation
-- Multi-service integration and orchestration
-
-### **Network Security**
-- Deep BGP protocol knowledge and security implications
-- RPKI validation implementation
-- Multi-layer security validation algorithms
-- Threat detection and scoring methodologies
-
-### **Software Engineering**
-- Python automation and AWS SDK integration
-- Error handling and graceful degradation
-- Modular, maintainable code architecture
-- Comprehensive testing and validation
-
-### **Business Communication**
-- Executive-level security reporting
-- Business value articulation
-- Technical documentation and knowledge transfer
-- Multi-cloud platform evaluation and recommendation
+This project turns BGP updates from on-prem / cloud edge routers into
+security scores, threat levels, and CloudWatch dashboards using AWS Lambda,
+Systems Manager Parameter Store, and CloudWatch metrics/alarms.
 
 ---
 
-**Built for enterprise network security and multi-cloud architecture demonstration**
+## 🎯 Business Problem
 
-*Showcasing cloud-native security engineering, real-time threat detection, and executive-level security reporting capabilities.*
+BGP (Border Gateway Protocol) is critical for connectivity but fragile from
+a security perspective:
+
+- **Route hijacking** can redirect traffic to malicious destinations
+- **AS path manipulation** enables interception and eavesdropping
+- **Route leaks** can create outages and data exposure
+- **Weak monitoring** means suspicious routes go unnoticed
+- **No standardized scoring** makes it hard to compare risk across clouds
+
+Most environments rely on basic reachability testing and manual review of
+router configs. This doesn’t scale and doesn’t surface risk in a way that
+security teams and leadership can act on.
+
+---
+
+## 💡 Solution Overview
+
+The **AWS BGP Security Monitoring System** provides:
+
+- A **Lambda-based BGP validator** (`bgp_with_ssm.py`) that scores each route
+- **Centralized configuration** in **AWS Systems Manager Parameter Store**
+  (`/bgp-security/*`)
+- **Custom CloudWatch metrics** for:
+  - SecurityScore
+  - ValidationCount (by threat level / result)
+  - ThreatDetectionCount (by threat level)
+- **Alarms & dashboards** for critical and high-risk routes
+- An optional **BGP collector** (`collector.py`) that normalizes BGP routes
+  and sends them to Lambda via Amazon EventBridge
+
+This gives you a repeatable, cloud-native way to watch BGP behavior and
+report risk across environments (on-prem, AWS, Azure, etc.).
+
+---
+
+## 🧩 High-Level Architecture
+
+![AWS BGP Security Architecture](aws-bgp-security-architecture.png)
+
+**Flow**
+
+1. **BGP Routers / On-Prem Edge**  
+   Edge routers (e.g., ASN 64512) establish BGP sessions to cloud providers
+   and upstream ISPs (Direct Connect, VPN, ExpressRoute, etc.).
+
+2. **BGP Collector (`collector.py`)**  
+   Runs on a management host or container. It:
+   - Polls a BGP daemon / router API / exported route files
+   - Normalizes each route into JSON:
+
+     ```json
+     {
+       "prefix": "8.8.8.0/24",
+       "origin_as": 15169,
+       "as_path": [64512, 15169]
+     }
+     ```
+
+   - Publishes these events to **Amazon EventBridge** (or directly invokes
+     the Lambda function).
+
+3. **Amazon EventBridge**  
+   - Receives route events from the collector (or from a schedule)
+   - Invokes the `bgp-validator` Lambda with the JSON payload
+
+4. **AWS Lambda – `bgp-validator`**  
+   - Loads configuration from **SSM Parameter Store**
+   - Validates each route:
+     - Malicious origin ASNs
+     - AS path loops
+     - Excessive path length
+     - (Future) RPKI validation
+   - Computes a **security score (0–100)** and **threat level**  
+     (`low`, `medium`, `high`, `critical`)
+   - Emits logs and **CloudWatch custom metrics**
+
+5. **AWS Systems Manager Parameter Store**  
+   Stores environment-specific policy:
+
+   - `/bgp-security/malicious-asns`
+   - `/bgp-security/max-as-path-length`
+   - `/bgp-security/scoring-weights`
+   - `/bgp-security/threat-thresholds`
+   - `/bgp-security/rpki-validator-url` (placeholder for future integration)
+
+6. **Amazon CloudWatch Logs & Metrics**  
+   - Stores Lambda execution logs
+   - Tracks `SecurityScore`, `ValidationCount`, and `ThreatDetectionCount`
+   - Dashboards visualize overall routing risk
+   - Alarms notify on critical/high threat detection
+
+---
+
+## 🏗️ Network Context (Multi-Cloud)
+
+This validator is designed for hybrid / multi-cloud BGP topologies. Examples:
+
+- **On-Prem → AWS Direct Connect**  
+  - On-premises ASN: 64512  
+  - AWS public ASN (example): 7224  
+  - BGP sessions secured with MD5, prefix filters, and route policies
+
+- **On-Prem / AWS TGW → Azure**  
+  - Transit Gateway ASN (example): 64513  
+  - Azure’s ASN (example): 12076 over VPN + ExpressRoute  
+  - Routes from multiple clouds are normalized and scored using the same
+    Lambda logic, giving a **consistent security view** across providers.
+
+Any BGP speaker that can export its route table in text/JSON form can be
+integrated by `collector.py`.
+
+---
+
+## ⚙️ Key Components
+
+- **AWS Lambda** – Stateless BGP validator and scoring engine
+- **AWS Systems Manager Parameter Store** – Central configuration for BGP
+  security policy
+- **Amazon CloudWatch Logs** – Lambda logs (per-route validation details)
+- **Amazon CloudWatch Metrics & Dashboards**
+  - Security scores and threat counters over time
+  - Alarms on critical/high threats and low security scores
+- **AWS IAM** – Least-privilege execution role for Lambda
+- **Amazon EventBridge** – Optional scheduled and/or event-driven invocations
+- **BGP Collector (`collector.py`)**
+  - Runs outside Lambda, close to the routers
+  - Translates raw BGP data into the JSON event format
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- AWS account with permissions for:
+  - IAM, Lambda, CloudWatch, Logs, SSM Parameter Store, EventBridge
+- AWS CLI v2 installed and configured
+- Python 3.x and `boto3` installed (for local tools)
+- Bash / Linux or WSL environment
+
+### 1. Clone and Configure
+
+```bash
+git clone <your-repo-url> aws-bgp-security
+cd aws-bgp-security
+
+# Set up environment
+export AWS_REGION=us-east-1
+export ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+
+cat > project-config.env << EOF
+export PROJECT_NAME="bgp-security"
+export AWS_REGION="us-east-1"
+export ACCOUNT_ID="$ACCOUNT_ID"
+export LAMBDA_FUNCTION_NAME="bgp-validator"
+export IAM_ROLE_NAME="lambda-bgp-execution-role"
+EOF
+
+source project-config.env
