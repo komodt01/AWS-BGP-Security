@@ -169,3 +169,39 @@ export IAM_ROLE_NAME="lambda-bgp-execution-role"
 EOF
 
 source project-config.env
+```
+
+Create Lambda Function Package
+cd lambda
+zip bgp-validator.zip bgp_with_ssm.py
+cd ..
+
+Deploy Core Infrastructure
+chmod +x deploy_complete.sh
+./deploy_complete.sh
+
+Run Validation Tests
+chmod +x run_tests.sh
+./run_tests.sh
+
+Set Up EventBridge (Optional but Recommended)
+aws events put-rule \
+  --name bgp-validator-scheduled-check \
+  --schedule-expression "rate(1 minute)" \
+  --state ENABLED
+
+aws lambda add-permission \
+  --function-name $LAMBDA_FUNCTION_NAME \
+  --statement-id bgp-schedule-permission \
+  --action "lambda:InvokeFunction" \
+  --principal events.amazonaws.com \
+  --source-arn arn:aws:events:$AWS_REGION:$ACCOUNT_ID:rule/bgp-validator-scheduled-check
+
+aws events put-targets \
+  --rule bgp-validator-scheduled-check \
+  --targets "Id"="1","Arn"="arn:aws:lambda:$AWS_REGION:$ACCOUNT_ID:function:$LAMBDA_FUNCTION_NAME","Input"='{"prefix":"8.8.8.0/24","origin_as":15169,"as_path":[64512,15169]}'
+
+Integrate the BGP Collector
+Configure collector.py on your BGP management host (see collector.py
+section below) so that actual routes from routers are validated in near
+real time.
